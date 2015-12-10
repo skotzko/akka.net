@@ -52,6 +52,7 @@ printfn "Assembly version: %s\nNuget version; %s\n" release.AssemblyVersion rele
 
 let binDir = "bin"
 let testOutput = FullName "TestResults"
+let perfOutput = FullName "PerfResults"
 
 let nugetDir = binDir @@ "nuget"
 let workingDir = binDir @@ "build"
@@ -185,6 +186,7 @@ Target "CopyOutput" <| fun _ ->
       "contrib/loggers/Akka.Logger.slf4net"
       "contrib/loggers/Akka.Logger.NLog" 
       "contrib/loggers/Akka.Logger.Serilog" 
+      "contrib/loggers/Akka.Logger.log4net" 
       "contrib/dependencyinjection/Akka.DI.Core"
       "contrib/dependencyinjection/Akka.DI.AutoFac"
       "contrib/dependencyinjection/Akka.DI.CastleWindsor"
@@ -274,6 +276,40 @@ Target "MultiNodeTests" <| fun _ ->
         if result <> 0 then failwithf "MultiNodeTestRunner failed. %s %s" multiNodeTestPath args
     
     multiNodeTestAssemblies |> Seq.iter (runMultiNodeSpec)
+
+//--------------------------------------------------------------------------------
+// NBench targets 
+//--------------------------------------------------------------------------------
+Target "NBench" <| fun _ ->
+    let testSearchPath =
+        let assemblyFilter = getBuildParamOrDefault "spec-assembly" String.Empty
+        sprintf "src/**/bin/Release/*%s*.Tests.Performance.dll" assemblyFilter
+
+    mkdir perfOutput
+    let nbenchTestPath = findToolInSubPath "NBench.Runner.exe" "src/packges/NBench.Runner*"
+    let nbenchTestAssemblies = !! testSearchPath
+    printfn "Using NBench.Runner: %s" nbenchTestPath
+
+    let runNBench assembly =
+        let spec = getBuildParam "spec"
+
+        let args = new StringBuilder()
+                |> append assembly
+                |> append (sprintf "output-directory=\"%s\"" perfOutput)
+                |> toText
+
+        let result = ExecProcess(fun info -> 
+            info.FileName <- nbenchTestPath
+            info.WorkingDirectory <- (Path.GetDirectoryName (FullName nbenchTestPath))
+            info.Arguments <- args) (System.TimeSpan.FromMinutes 15.0) (* Reasonably long-running task. *)
+        if result <> 0 then failwithf "NBench.Runner failed. %s %s" nbenchTestPath args
+    
+    nbenchTestAssemblies |> Seq.iter (runNBench)
+
+//--------------------------------------------------------------------------------
+// Clean NBench output
+Target "CleanPerf" <| fun _ ->
+    DeleteDir perfOutput
 
 
 //--------------------------------------------------------------------------------
@@ -558,7 +594,10 @@ Target "HelpMultiNodeTests" <| fun _ ->
 
 // tests dependencies
 "CleanTests" ==> "RunTests"
-"BuildRelease" ==> "CleanTests" ==> "MultiNodeTests"
+"CleanTests" ==> "MultiNodeTests"
+
+// NBench dependencies
+"CleanPerf" ==> "NBench"
 
 // nuget dependencies
 "CleanNuget" ==> "CreateNuget"
@@ -571,6 +610,7 @@ Target "All" DoNothing
 "BuildRelease" ==> "All"
 "RunTests" ==> "All"
 "MultiNodeTests" ==> "All"
+"NBench" ==> "All"
 "Nuget" ==> "All"
 
 Target "AllTests" DoNothing //used for Mono builds, due to Mono 4.0 bug with FAKE / NuGet https://github.com/fsharp/fsharp/issues/427
