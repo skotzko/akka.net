@@ -30,8 +30,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="NBench, Version=0.1.3.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\NBench.0.1.3\lib\net45\NBench.dll</HintPath>
+    <Reference Include="NBench, Version=0.1.5.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\NBench.0.1.5\lib\net45\NBench.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -40,7 +40,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Actor\ActorMemoryFootprintSpec.cs" />
+    <Compile Include="Actor\ActorPathSpec.cs" />
+    <Compile Include="Actor\AddressSpec.cs" />
+    <Compile Include="Actor\MinimalActorRefThroughputSpec.cs" />
+    <Compile Include="Actor\ReceiveActorThroughputSpec.cs" />
+    <Compile Include="Actor\UntypedActorThroughputSpec.cs" />
     <Compile Include="Dispatch\MailboxMemoryFootprintSpec.cs" />
+    <Compile Include="Actor\ActorThroughputSpecBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -54,6 +60,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

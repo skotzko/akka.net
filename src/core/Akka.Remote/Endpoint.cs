@@ -61,15 +61,18 @@ namespace Akka.Remote
             var sender = senderOption ?? system.DeadLetters;
             var originalReceiver = recipient.Path;
 
-            var msgLog = string.Format("RemoteMessage: {0} to {1}<+{2} from {3}", payload, recipient, originalReceiver,
-                sender);
+
             // message is intended for the RemoteDaemon, usually a command to create a remote actor
             if (recipient == remoteDaemon)
             {
                 if (settings.UntrustedMode) log.Debug("dropping daemon message in untrusted mode");
                 else
                 {
-                    if (settings.LogReceive) log.Debug("received daemon message [{0}]", msgLog);
+                    if (settings.LogReceive)
+                    {
+                        var msgLog = string.Format("RemoteMessage: {0} to {1}<+{2} from {3}", payload, recipient, originalReceiver,sender);
+                        log.Debug("received daemon message [{0}]", msgLog);
+                    }
                     remoteDaemon.Tell(payload);
                 }
             }
@@ -77,49 +80,53 @@ namespace Akka.Remote
             //message is intended for a local recipient
             else if ((recipient is ILocalRef || recipient is RepointableActorRef) && recipient.IsLocal)
             {
-                if (settings.LogReceive) log.Debug("received local message [{0}]", msgLog);
-                if (payload is ActorSelectionMessage)
+                if (settings.LogReceive)
                 {
-                    var sel = (ActorSelectionMessage) payload;
-
-                    var actorPath = "/" + string.Join("/", sel.Elements.Select(x => x.ToString()));
-                    if (settings.UntrustedMode
-                        && (!settings.TrustedSelectionPaths.Contains(actorPath)
+                    var msgLog = string.Format("RemoteMessage: {0} to {1}<+{2} from {3}", payload, recipient, originalReceiver,sender);
+                    log.Debug("received local message [{0}]", msgLog);
+                }
+                payload.Match()
+                    .With<ActorSelectionMessage>(sel =>
+                    {
+                        var actorPath = "/" + string.Join("/", sel.Elements.Select(x => x.ToString()));
+                        if (settings.UntrustedMode
+                            && (!settings.TrustedSelectionPaths.Contains(actorPath)
                             || sel.Message is IPossiblyHarmful
-                            || recipient != provider.RootGuardian))
+                            || recipient != provider.Guardian))
+                        {
+                            log.Debug(
+                                "operating in UntrustedMode, dropping inbound actor selection to [{0}], allow it" +
+                                "by adding the path to 'akka.remote.trusted-selection-paths' in configuration",
+                                actorPath);
+                        }
+                        else
+                        {
+                            //run the receive logic for ActorSelectionMessage here to make sure it is not stuck on busy user actor
+                            ActorSelection.DeliverSelection(recipient, sender, sel);
+                        }
+                    })
+                    .With<IPossiblyHarmful>(msg =>
                     {
-                        log.Debug(
-                            "operating in UntrustedMode, dropping inbound actor selection to [{0}], allow it" +
-                            "by adding the path to 'akka.remote.trusted-selection-paths' in configuration",
-                            actorPath);
-                    }
-                    else
+                        if (settings.UntrustedMode)
+                        {
+                            log.Debug("operating in UntrustedMode, dropping inbound IPossiblyHarmful message of type {0}", msg.GetType());
+                        }
+                    })
+                    .With<ISystemMessage>(msg => { recipient.Tell(msg); })
+                    .Default(msg =>
                     {
-                        //run the receive logic for ActorSelectionMessage here to make sure it is not stuck on busy user actor
-                        ActorSelection.DeliverSelection(recipient, sender, sel);
-                    }
-                }
-                else if (payload is IPossiblyHarmful && settings.UntrustedMode)
-                {
-                    log.Debug("operating in UntrustedMode, dropping inbound IPossiblyHarmful message of type {0}",
-                        payload.GetType());
-                }
-                else if (payload is ISystemMessage)
-                {
-                    recipient.Tell(payload);
-                }
-                else
-                {
-                    recipient.Tell(payload, sender);
-                }
-
+                        recipient.Tell(msg, sender);
+                    });
             }
 
             // message is intended for a remote-deployed recipient
-            else if ((recipient is IRemoteRef || recipient is RepointableActorRef) && !recipient.IsLocal &&
-                     !settings.UntrustedMode)
+            else if ((recipient is IRemoteRef || recipient is RepointableActorRef) && !recipient.IsLocal && !settings.UntrustedMode)
             {
-                if (settings.LogReceive) log.Debug("received remote-destined message {0}", msgLog);
+                if (settings.LogReceive)
+                {
+                    var msgLog = string.Format("RemoteMessage: {0} to {1}<+{2} from {3}", payload, recipient, originalReceiver, sender);
+                    log.Debug("received remote-destined message {0}", msgLog);
+                }
                 if (provider.Transport.Addresses.Contains(recipientAddress))
                 {
                     //if it was originally addressed to us but is in fact remote from our point of view (i.e. remote-deployed)
@@ -135,8 +142,8 @@ namespace Akka.Remote
             else
             {
                 log.Error(
-                    "Dropping message [{0}] for non-local recipient [{1}] arriving at [{2}] inbound addresses [{3}]",
-                    payloadClass, recipient, recipientAddress, string.Join(",", provider.Transport.Addresses));
+                        "Dropping message [{0}] for non-local recipient [{1}] arriving at [{2}] inbound addresses [{3}]",
+                        payloadClass, recipient, recipientAddress, string.Join(",", provider.Transport.Addresses));
             }
         }
     }
