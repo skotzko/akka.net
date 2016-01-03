@@ -41,10 +41,14 @@
   <ItemGroup>
     <Compile Include="Actor\ActorMemoryFootprintSpec.cs" />
     <Compile Include="Actor\ActorPathSpec.cs" />
+    <Compile Include="Actor\ActorSelectionSpecs.cs" />
     <Compile Include="Actor\AddressSpec.cs" />
     <Compile Include="Actor\MinimalActorRefThroughputSpec.cs" />
     <Compile Include="Actor\ReceiveActorThroughputSpec.cs" />
     <Compile Include="Actor\UntypedActorThroughputSpec.cs" />
+    <Compile Include="Dispatch\DefaultDispatcherColdThroughputSpec.cs" />
+    <Compile Include="Dispatch\DispatcherThroughputSpecBase.cs" />
+    <Compile Include="Dispatch\ForkJoinDispatcherThroughputSpec.cs" />
     <Compile Include="Dispatch\MailboxMemoryFootprintSpec.cs" />
     <Compile Include="Actor\ActorThroughputSpecBase.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
